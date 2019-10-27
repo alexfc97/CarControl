@@ -4,7 +4,6 @@
 
 //Hans Henrik Lovengreen       Oct 8, 2019
 
-
 import java.awt.Color;
 
 class Gate {
@@ -53,21 +52,15 @@ class Conductor extends Thread {
     Pos curpos;                      // Current position
     Pos newpos;                      // New position to go to
     Semaphore[][] sFields;
-    Alley alley = new Alley();
+    CarControl.Alley alley;
 
-    class Alley {
 
-        public void enter(int no) {
-        }
-        public void leave(int no) {
-        }
-    }
-
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields) {
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley ) {
 
         this.no = no;
         this.cd = cd;
         this.sFields = sFields;
+        this.alley = alley;
         mygate = g;
 
         startpos = cd.getStartPos(no);
@@ -112,11 +105,24 @@ class Conductor extends Thread {
         return pos.equals(startpos);
     }
 
-    public void takeSpace(int row, int col) throws InterruptedException {
+    public void takeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].P();
+        if((row==10 && col==1) || (row==2 && col==2) || (row==1 && col==3)) {
+            alley.enter(no);
+        }
     }
-    public void freeSpace(int row, int col) {
+    public void freeSpace(int row, int col, int no) {
         sFields[row][col].V();
+        if (no<=4) {
+            if(row==9 && col==0) {
+                alley.leave(no);
+            }
+        }
+        if (no>=5) {
+            if(row==0 && col==2) {
+                alley.leave(no);
+            }
+        }
     }
 
     public void run() {
@@ -133,12 +139,11 @@ class Conductor extends Thread {
                 }
                 newpos = nextPos(curpos);
 
-                takeSpace(newpos.row, newpos.col);
+                takeSpace(newpos.row, newpos.col, no);
 
                 car.driveTo(newpos);
-//                    alley.enter(no);
 
-                freeSpace(curpos.row, curpos.col);
+                freeSpace(curpos.row, curpos.col, no);
 
                 curpos = newpos;
             }
@@ -161,10 +166,67 @@ public class CarControl implements CarControlI{
 
     }
 
+    class Barrier {
+        boolean barrieractivated = false;
+        Semaphore barrierTickets = new Semaphore(8);
+
+        public void sync() {  }  // Wait for others to arrive (if barrier active)
+
+        public void on() {
+            barrieractivated = true;
+        }    // Activate barrier
+
+
+        public void off() {
+            boolean barrieractivated = false;
+        }   // Deactivate barrier
+
+    }
+
+    class Alley {
+
+        int carsInValley = 0;
+        boolean upperAllowed = true;
+        boolean lowerAllowed = true;
+        Semaphore alley = new Semaphore(1);
+
+        public void enter(int no) throws InterruptedException {
+            if(upperAllowed && lowerAllowed) {
+                alley.P();
+                if(no<=4) {
+                    upperAllowed = false;
+                }
+                else {
+                    lowerAllowed = false;
+                }
+            }
+            else if (upperAllowed && no<=4) {
+                System.out.println("stuck in 1st: " + no);
+                alley.P();
+
+            }
+            else if (lowerAllowed && no>=5) {
+                System.out.println("stuck in 2nd " + no);
+                alley.P();
+            }
+            carsInValley++;
+
+        }
+        public void leave(int no) {
+            carsInValley--;
+            if(carsInValley==0) {
+                alley.V();
+                upperAllowed = true;
+                lowerAllowed = true;
+            }
+        }
+    }
+
     CarDisplayI cd;           // Reference to GUI
     Conductor[] conductor;    // Car controllers
     Gate[] gate;              // Gates
     Semaphore[][] sFields = new Semaphore[11][12];
+    Alley alleysync = new Alley();
 
     public CarControl(CarDisplayI cd) {
         this.cd = cd;
@@ -175,7 +237,7 @@ public class CarControl implements CarControlI{
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
