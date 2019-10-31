@@ -111,7 +111,7 @@ class Conductor extends Thread {
             alley.enter(no);
         }
     }
-    public void freeSpace(int row, int col, int no) {
+    public void freeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].V();
         if (no<=4) {
             if(row==9 && col==0) {
@@ -137,6 +137,7 @@ class Conductor extends Thread {
                     mygate.pass();
                     car.setSpeed(chooseSpeed());
                 }
+
                 newpos = nextPos(curpos);
 
                 takeSpace(newpos.row, newpos.col, no);
@@ -166,59 +167,79 @@ public class CarControl implements CarControlI{
 
     }
 
-    class Barrier {
-        boolean barrieractivated = false;
+/*    class Barrier {
+        boolean barrierActivated = false;
         Semaphore barrierTickets = new Semaphore(8);
 
-        public void sync() {  }  // Wait for others to arrive (if barrier active)
+        public void sync() {
+            if(barrierActivated) {
+
+            }
+        }  // Wait for others to arrive (if barrier active)
 
         public void on() {
-            barrieractivated = true;
+            barrierActivated = true;
         }    // Activate barrier
 
-
         public void off() {
-            boolean barrieractivated = false;
+            barrierActivated = false;
         }   // Deactivate barrier
 
-    }
+    }*/
 
     class Alley {
 
         int carsInValley = 0;
-        boolean upperAllowed = true;
-        boolean lowerAllowed = true;
+        boolean LowerPassageAllowed = true;
+        boolean HigherPassageAllowed = true;
+        boolean oneWaiting = false;
         Semaphore alley = new Semaphore(1);
+        Semaphore lock = new Semaphore(1);
+        Semaphore topSync = new Semaphore(0);
 
         public void enter(int no) throws InterruptedException {
-            if(upperAllowed && lowerAllowed) {
+            lock.P();
+            if(LowerPassageAllowed && HigherPassageAllowed) {
+                System.out.println("at upper and lower: " + no);
+                lock.V();
                 alley.P();
+                lock.P();
                 if(no<=4) {
-                    upperAllowed = false;
+                    LowerPassageAllowed = false;
                 }
                 else {
-                    lowerAllowed = false;
+                    HigherPassageAllowed = false;
                 }
             }
-            else if (upperAllowed && no<=4) {
-                System.out.println("stuck in 1st: " + no);
+            else if (LowerPassageAllowed && no<=4) {
+                lock.V();
                 alley.P();
+                lock.P();
+                HigherPassageAllowed = true;
+                LowerPassageAllowed = false;
 
             }
-            else if (lowerAllowed && no>=5) {
-                System.out.println("stuck in 2nd " + no);
+            else if (HigherPassageAllowed && no>=5) {
+
+                lock.V();
                 alley.P();
+                lock.P();
+                HigherPassageAllowed = false;
+                LowerPassageAllowed = true;
             }
             carsInValley++;
-
+            lock.V();
         }
-        public void leave(int no) {
+
+        public void leave(int no) throws InterruptedException {
+            lock.P();
             carsInValley--;
             if(carsInValley==0) {
+                LowerPassageAllowed = true;
+                HigherPassageAllowed = true;
                 alley.V();
-                upperAllowed = true;
-                lowerAllowed = true;
             }
+            lock.V();
         }
     }
 
