@@ -195,7 +195,7 @@ public class CarControl implements CarControlI{
         boolean oneWaiting = false;
         Semaphore alley = new Semaphore(1);
         Semaphore lock = new Semaphore(1);
-        Semaphore topSync = new Semaphore(0);
+        Semaphore topSync = new Semaphore(1);
 
         public void enter(int no) throws InterruptedException {
             lock.P();
@@ -212,15 +212,24 @@ public class CarControl implements CarControlI{
                 }
             }
             else if (LowerPassageAllowed && no<=4) {
-                lock.V();
-                alley.P();
-                lock.P();
+                if(oneWaiting) {
+                    lock.V();
+                    topSync.P();
+                    lock.P();
+                } else {
+                    oneWaiting = true;
+                    topSync.P();
+                    lock.V();
+                    alley.P();
+                    lock.P();
+                }
                 HigherPassageAllowed = true;
                 LowerPassageAllowed = false;
+                oneWaiting = false;
+                topSync.V();
 
             }
             else if (HigherPassageAllowed && no>=5) {
-
                 lock.V();
                 alley.P();
                 lock.P();
