@@ -107,22 +107,9 @@ class Conductor extends Thread {
 
     public void takeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].P();
-        if((row==10 && col==1) || (row==2 && col==2) || (row==1 && col==3)) {
-            alley.enter(no);
-        }
     }
     public void freeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].V();
-        if (no<=4) {
-            if(row==9 && col==0) {
-                alley.leave(no);
-            }
-        }
-        if (no>=5) {
-            if(row==0 && col==2) {
-                alley.leave(no);
-            }
-        }
     }
 
     public void run() {
@@ -145,6 +132,21 @@ class Conductor extends Thread {
                 car.driveTo(newpos);
 
                 freeSpace(curpos.row, curpos.col, no);
+
+                if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
+                    alley.enter(no);
+                }
+
+                if (no<=4) {
+                    if(curpos.row==9 && curpos.col==0) {
+                        alley.leave(no);
+                    }
+                }
+                if (no>=5) {
+                    if(curpos.row==0 && curpos.col==2) {
+                        alley.leave(no);
+                    }
+                }
 
                 curpos = newpos;
             }
@@ -200,7 +202,7 @@ public class CarControl implements CarControlI{
         public void enter(int no) throws InterruptedException {
             lock.P();
             if(LowerPassageAllowed && HigherPassageAllowed) {
-                System.out.println("at upper and lower: " + no);
+                //System.out.println("at upper and lower: " + no);
                 lock.V();
                 alley.P();
                 lock.P();
