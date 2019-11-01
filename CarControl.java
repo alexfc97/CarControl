@@ -53,14 +53,16 @@ class Conductor extends Thread {
     Pos newpos;                      // New position to go to
     Semaphore[][] sFields;
     CarControl.Alley alley;
+    CarControl.Barrier barrier;
 
 
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley ) {
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier) {
 
         this.no = no;
         this.cd = cd;
         this.sFields = sFields;
         this.alley = alley;
+        this.barrier = barrier;
         mygate = g;
 
         startpos = cd.getStartPos(no);
@@ -148,6 +150,15 @@ class Conductor extends Thread {
                     }
                 }
 
+                if(barrier.barrierActivated) {
+                    if(no>=5 && newpos.row==5 && newpos.col>7) {
+                        barrier.sync(no);
+                    }
+                    else if (no<=4 && newpos.row==6 && newpos.col>2) {
+                        barrier.sync(no);
+                    }
+                }
+
                 curpos = newpos;
             }
 
@@ -169,25 +180,47 @@ public class CarControl implements CarControlI{
 
     }
 
-/*    class Barrier {
+    public void initBarrierSemaphore(Semaphore[] barrierSemaphore) {
+        for (int i = 0; i <= 8; i++)
+            barrierSemaphore[i] = new Semaphore(0);
+    }
+
+    class Barrier {
         boolean barrierActivated = false;
-        Semaphore barrierTickets = new Semaphore(8);
+        int carsAtBarrier = 0;
+        Semaphore lock = new Semaphore(1);
 
-        public void sync() {
-            if(barrierActivated) {
-
+        // Wait for others to arrive (if barrier active)
+        public void sync(int no) throws InterruptedException {
+            lock.P();
+            carsAtBarrier++;
+            if(carsAtBarrier==9) {
+                for (int i = 0; i <= 8; i++) {
+                    barrierSemaphore[i].V();
+                }
+                carsAtBarrier=0;
+                lock.V();
+                barrierSemaphore[no].P();
+                lock.P();
+            } else {
+                lock.V();
+                barrierSemaphore[no].P();
+                lock.P();
             }
-        }  // Wait for others to arrive (if barrier active)
+            lock.V();
+        }
 
+        // Activate barrier
         public void on() {
             barrierActivated = true;
-        }    // Activate barrier
+        }
 
+        // Deactivate barrier
         public void off() {
             barrierActivated = false;
-        }   // Deactivate barrier
+        }
 
-    }*/
+    }
 
     class Alley {
 
@@ -258,7 +291,9 @@ public class CarControl implements CarControlI{
     Conductor[] conductor;    // Car controllers
     Gate[] gate;              // Gates
     Semaphore[][] sFields = new Semaphore[11][12];
+    Semaphore[] barrierSemaphore = new Semaphore[9];
     Alley alleysync = new Alley();
+    Barrier barrier = new Barrier();
 
     public CarControl(CarDisplayI cd) {
         this.cd = cd;
@@ -266,10 +301,11 @@ public class CarControl implements CarControlI{
         gate = new Gate[9];
 
         initSemFields(sFields);
+        initBarrierSemaphore(barrierSemaphore);
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
@@ -284,11 +320,11 @@ public class CarControl implements CarControlI{
     }
 
     public void barrierOn() {
-        cd.println("Barrier On not implemented in this version");
+        barrier.on();
     }
 
     public void barrierOff() {
-        cd.println("Barrier Off not implemented in this version");
+        barrier.off();
     }
 
     public void setLimit(int k) {
