@@ -5,6 +5,7 @@
 //Hans Henrik Lovengreen       Oct 8, 2019
 
 import java.awt.Color;
+import java.util.ArrayList;
 
 class Gate {
 
@@ -31,7 +32,6 @@ class Gate {
         }
         e.V();
     }
-
 }
 
 // opret array med semaphores, som tilsvarer antal felter som en bil tager når det kører ind i det
@@ -72,7 +72,7 @@ class Conductor extends Thread {
 
         // special settings for car no. 0
         if (no==0) {
-            basespeed = -1.0;
+            basespeed = 1.0;
             variation = 0;
         }
     }
@@ -189,16 +189,19 @@ public class CarControl implements CarControlI{
         boolean barrierActivated = false;
         int carsAtBarrier = 0;
         Semaphore lock = new Semaphore(1);
+        ArrayList<Integer> carsWaiting = new ArrayList<Integer>();
 
         // Wait for others to arrive (if barrier active)
         public void sync(int no) throws InterruptedException {
             lock.P();
             carsAtBarrier++;
+            carsWaiting.add(no);
             if(carsAtBarrier==9) {
                 for (int i = 0; i <= 8; i++) {
                     barrierSemaphore[i].V();
                 }
                 carsAtBarrier=0;
+                carsWaiting.clear();
                 lock.V();
                 barrierSemaphore[no].P();
                 lock.P();
@@ -218,6 +221,11 @@ public class CarControl implements CarControlI{
         // Deactivate barrier
         public void off() {
             barrierActivated = false;
+            for(int cars : carsWaiting) {
+                barrierSemaphore[cars].V();
+            }
+            carsWaiting.clear();
+            carsAtBarrier = 0;
         }
 
     }
