@@ -5,7 +5,6 @@
 //Hans Henrik Lovengreen       Oct 8, 2019
 
 import java.awt.Color;
-import java.util.ArrayList;
 
 class Gate {
 
@@ -188,29 +187,16 @@ public class CarControl implements CarControlI{
     class Barrier {
         boolean barrierActivated = false;
         int carsAtBarrier = 0;
-        Semaphore lock = new Semaphore(1);
-        ArrayList<Integer> carsWaiting = new ArrayList<Integer>();
 
         // Wait for others to arrive (if barrier active)
-        public void sync(int no) throws InterruptedException {
-            lock.P();
+        public synchronized void sync(int no) throws InterruptedException {
             carsAtBarrier++;
-            carsWaiting.add(no);
             if(carsAtBarrier==9) {
-                for (int i = 0; i <= 8; i++) {
-                    barrierSemaphore[i].V();
-                }
+                notifyAll();
                 carsAtBarrier=0;
-                carsWaiting.clear();
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
             } else {
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
+                wait();
             }
-            lock.V();
         }
 
         // Activate barrier
@@ -219,12 +205,9 @@ public class CarControl implements CarControlI{
         }
 
         // Deactivate barrier
-        public void off() {
+        public synchronized void off() {
             barrierActivated = false;
-            for(int cars : carsWaiting) {
-                barrierSemaphore[cars].V();
-            }
-            carsWaiting.clear();
+            notifyAll();
             carsAtBarrier = 0;
         }
 
@@ -236,17 +219,9 @@ public class CarControl implements CarControlI{
         boolean LowerPassageAllowed = true;
         boolean HigherPassageAllowed = true;
         boolean oneWaiting = false;
-        Semaphore alley = new Semaphore(1);
-        Semaphore lock = new Semaphore(1);
-        Semaphore topSync = new Semaphore(1);
 
-        public void enter(int no) throws InterruptedException {
-            lock.P();
+        public synchronized void enter(int no) throws InterruptedException {
             if(LowerPassageAllowed && HigherPassageAllowed) {
-                //System.out.println("at upper and lower: " + no);
-                lock.V();
-                alley.P();
-                lock.P();
                 if(no<=4) {
                     LowerPassageAllowed = false;
                 }
@@ -256,42 +231,31 @@ public class CarControl implements CarControlI{
             }
             else if (LowerPassageAllowed && no<=4) {
                 if(oneWaiting) {
-                    lock.V();
-                    topSync.P();
-                    lock.P();
+                    wait();
                 } else {
                     oneWaiting = true;
-                    topSync.P();
-                    lock.V();
-                    alley.P();
-                    lock.P();
+                    wait();
                 }
                 HigherPassageAllowed = true;
                 LowerPassageAllowed = false;
                 oneWaiting = false;
-                topSync.V();
 
             }
             else if (HigherPassageAllowed && no>=5) {
-                lock.V();
-                alley.P();
-                lock.P();
+                wait();
                 HigherPassageAllowed = false;
                 LowerPassageAllowed = true;
             }
             carsInValley++;
-            lock.V();
         }
 
-        public void leave(int no) throws InterruptedException {
-            lock.P();
+        public synchronized void leave(int no) throws InterruptedException {
             carsInValley--;
             if(carsInValley==0) {
                 LowerPassageAllowed = true;
                 HigherPassageAllowed = true;
-                alley.V();
+                notifyAll();
             }
-            lock.V();
         }
     }
 
