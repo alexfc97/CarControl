@@ -186,6 +186,7 @@ public class CarControl implements CarControlI{
 
     class Barrier {
         boolean barrierActivated = false;
+        boolean barrierShutDown = false;
         int carsAtBarrier = 0;
 
         // Wait for others to arrive (if barrier active)
@@ -209,6 +210,21 @@ public class CarControl implements CarControlI{
             barrierActivated = false;
             notifyAll();
             carsAtBarrier = 0;
+        }
+
+        public synchronized void shutDown() {
+            barrierShutDown = true;
+            if(barrierActivated) {
+                try {
+                    wait();
+                    barrierShutDown = false;
+                    off();
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+            } else {
+                cd.println("Barrier is not activated");
+            }
         }
 
     }
@@ -304,12 +320,7 @@ public class CarControl implements CarControlI{
     }
 
     public void barrierShutDown() {
-        cd.println("Barrier shut down not implemented in this version");
-        // This sleep is for illustrating how blocking affects the GUI
-        // Remove when shutdown is implemented.
-        try { Thread.sleep(3000); } catch (InterruptedException e) { }
-        // Recommendation:
-        //   If not implemented call barrier.off() instead to make graphics consistent
+        barrier.shutDown();
     }
 
     public void removeCar(int no) {
