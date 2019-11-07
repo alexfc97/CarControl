@@ -168,7 +168,6 @@ class Conductor extends Thread {
             e.printStackTrace();
         }
     }
-
 }
 
 public class CarControl implements CarControlI{
@@ -187,8 +186,10 @@ public class CarControl implements CarControlI{
 
     class Barrier {
         boolean barrierActivated = false;
+        boolean barrierShutDown = false;
         int carsAtBarrier = 0;
         Semaphore lock = new Semaphore(1);
+        Semaphore shutDown = new Semaphore(0);
         ArrayList<Integer> carsWaiting = new ArrayList<Integer>();
 
         // Wait for others to arrive (if barrier active)
@@ -197,11 +198,15 @@ public class CarControl implements CarControlI{
             carsAtBarrier++;
             carsWaiting.add(no);
             if(carsAtBarrier==9) {
-                for (int i = 0; i <= 8; i++) {
-                    barrierSemaphore[i].V();
+                if(barrierShutDown) {
+                    shutDown.V();
+                } else {
+                    for (int i = 0; i <= 8; i++) {
+                        barrierSemaphore[i].V();
+                    }
+                    carsAtBarrier=0;
+                    carsWaiting.clear();
                 }
-                carsAtBarrier=0;
-                carsWaiting.clear();
                 lock.V();
                 barrierSemaphore[no].P();
                 lock.P();
@@ -227,7 +232,20 @@ public class CarControl implements CarControlI{
             carsWaiting.clear();
             carsAtBarrier = 0;
         }
-
+        public void shutDown() {
+            barrierShutDown = true;
+            if (barrierActivated) {
+                try {
+                    shutDown.P();
+                    barrierShutDown = false;
+                    off();
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+            } else {
+                cd.println("Barrier not activated");
+            }
+        }
     }
 
     class Alley {
@@ -340,12 +358,7 @@ public class CarControl implements CarControlI{
     }
 
     public void barrierShutDown() {
-        cd.println("Barrier shut down not implemented in this version");
-        // This sleep is for illustrating how blocking affects the GUI
-        // Remove when shutdown is implemented.
-        try { Thread.sleep(3000); } catch (InterruptedException e) { }
-        // Recommendation:
-        //   If not implemented call barrier.off() instead to make graphics consistent
+        barrier.shutDown();
     }
 
     public void removeCar(int no) {
