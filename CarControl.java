@@ -53,15 +53,19 @@ class Conductor extends Thread {
     Semaphore[][] sFields;
     CarControl.Alley alley;
     CarControl.Barrier barrier;
+    Boolean[] removeCarBoolean;
+    Boolean[] restoreCarBoolean;
 
 
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier) {
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, Boolean[] removeCarBoolean, Boolean[] restoreCarBoolean) {
 
         this.no = no;
         this.cd = cd;
         this.sFields = sFields;
         this.alley = alley;
         this.barrier = barrier;
+        this.removeCarBoolean = removeCarBoolean;
+        this.restoreCarBoolean = restoreCarBoolean;
         mygate = g;
 
         startpos = cd.getStartPos(no);
@@ -105,6 +109,9 @@ class Conductor extends Thread {
     boolean atGate(Pos pos) {
         return pos.equals(startpos);
     }
+    boolean atBarrier(Pos pos) {
+        return pos.equals(barpos);
+    }
 
     public void takeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].P();
@@ -112,53 +119,78 @@ class Conductor extends Thread {
     public void freeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].V();
     }
+    public void removeCar(int no) {
+        removeCarBoolean[no] = true;
+    }
+    public void restoreCar(int no) {
+        if(removeCarBoolean[no]) {
+            restoreCarBoolean[no] = true;
+        } else {
+            cd.println("Car already registered");
+        }
+    }
 
     public void run() {
         try {
             CarI car = cd.newCar(no, col, startpos);
             curpos = startpos;
             cd.register(car);
+            boolean hasBeenRemoved = false;
 
             while (true) {
 
-                if (atGate(curpos)) {
-                    mygate.pass();
-                    car.setSpeed(chooseSpeed());
-                }
+                if(!removeCarBoolean[no]) {
+                    if (atGate(curpos)) {
+                        mygate.pass();
+                        car.setSpeed(chooseSpeed());
+                    }
 
-                newpos = nextPos(curpos);
+                    newpos = nextPos(curpos);
 
-                takeSpace(newpos.row, newpos.col, no);
+                    takeSpace(newpos.row, newpos.col, no);
 
-                car.driveTo(newpos);
+                    car.driveTo(newpos);
 
-                freeSpace(curpos.row, curpos.col, no);
+                    freeSpace(curpos.row, curpos.col, no);
 
-                if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
-                    alley.enter(no);
-                }
+                    if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
+                        alley.enter(no);
+                    }
 
-                if (no<=4) {
-                    if(curpos.row==9 && curpos.col==0) {
-                        alley.leave(no);
+                    if (no <= 4) {
+                        if (curpos.row == 9 && curpos.col == 0) {
+                            alley.leave(no);
+                        }
+                    }
+                    if (no >= 5) {
+                        if (curpos.row == 0 && curpos.col == 2) {
+                            alley.leave(no);
+                        }
+                    }
+
+                    if (barrier.barrierActivated) {
+                        if(atBarrier(newpos)) {
+                            barrier.sync(no);
+                        }
+                    }
+
+                    curpos = newpos;
+                } else {
+                    if (!hasBeenRemoved) {
+                        cd.deregister(car);
+                        freeSpace(newpos.row, newpos.col, no);
+                        hasBeenRemoved = true;
+                    }
+                    System.out.println("this has to be here to work");
+                    if (restoreCarBoolean[no]) {
+                        System.out.println("Registering car: " + no);
+                        removeCarBoolean[no] = false;
+                        hasBeenRemoved = false;
+                        restoreCarBoolean[no] = false;
+                        // curpos = startpos;
+                        cd.register(car);
                     }
                 }
-                if (no>=5) {
-                    if(curpos.row==0 && curpos.col==2) {
-                        alley.leave(no);
-                    }
-                }
-
-                if(barrier.barrierActivated) {
-                    if(no>=5 && newpos.row==5 && newpos.col>7) {
-                        barrier.sync(no);
-                    }
-                    else if (no<=4 && newpos.row==6 && newpos.col>2) {
-                        barrier.sync(no);
-                    }
-                }
-
-                curpos = newpos;
             }
 
         } catch (Exception e) {
@@ -182,6 +214,16 @@ public class CarControl implements CarControlI{
     public void initBarrierSemaphore(Semaphore[] barrierSemaphore) {
         for (int i = 0; i <= 8; i++)
             barrierSemaphore[i] = new Semaphore(0);
+    }
+
+    public void initRemoveCarBooleans(Boolean[] removeCarBoolean) {
+        for (int i = 0; i <= 8; i++)
+            removeCarBoolean[i] = false;
+    }
+
+    public void initRestoreCarBooleans(Boolean[] removeCarBoolean) {
+        for (int i = 0; i <= 8; i++)
+            removeCarBoolean[i] = false;
     }
 
     class Barrier {
@@ -280,6 +322,8 @@ public class CarControl implements CarControlI{
     Gate[] gate;              // Gates
     Semaphore[][] sFields = new Semaphore[11][12];
     Semaphore[] barrierSemaphore = new Semaphore[9];
+    Boolean[] removeCarBoolean = new Boolean[9];
+    Boolean[] restoreCarBoolean = new Boolean[9];
     Alley alleysync = new Alley();
     Barrier barrier = new Barrier();
 
@@ -290,10 +334,12 @@ public class CarControl implements CarControlI{
 
         initSemFields(sFields);
         initBarrierSemaphore(barrierSemaphore);
+        initRemoveCarBooleans(removeCarBoolean);
+        initRestoreCarBooleans(restoreCarBoolean);
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, removeCarBoolean, restoreCarBoolean);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
@@ -324,11 +370,11 @@ public class CarControl implements CarControlI{
     }
 
     public void removeCar(int no) {
-        cd.println("Remove Car not implemented in this version");
+        conductor[no].removeCar(no);
     }
 
     public void restoreCar(int no) {
-        cd.println("Restore Car not implemented in this version");
+        conductor[no].restoreCar(no);
     }
 
     /* Speed settings for testing purposes */
