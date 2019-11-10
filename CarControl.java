@@ -113,14 +113,19 @@ class Conductor extends Thread {
         return pos.equals(barpos);
     }
 
-    public void takeSpace(int row, int col, int no) throws InterruptedException {
+    public void takeSpace(int row, int col) throws InterruptedException {
         sFields[row][col].P();
     }
-    public void freeSpace(int row, int col, int no) throws InterruptedException {
+    public void freeSpace(int row, int col) {
         sFields[row][col].V();
     }
     public void removeCar(int no) {
-        removeCarBoolean[no] = true;
+        if(!removeCarBoolean[no]) {
+            System.out.println("This is happening while waiting for space to free up");
+            removeCarBoolean[no] = true;
+        } else {
+            cd.println("Car already removed");
+        }
     }
     public void restoreCar(int no) {
         if(removeCarBoolean[no]) {
@@ -136,6 +141,7 @@ class Conductor extends Thread {
             curpos = startpos;
             cd.register(car);
             boolean hasBeenRemoved = false;
+            boolean inAlley = false;
 
             while (true) {
 
@@ -147,24 +153,27 @@ class Conductor extends Thread {
 
                     newpos = nextPos(curpos);
 
-                    takeSpace(newpos.row, newpos.col, no);
+                    takeSpace(newpos.row, newpos.col);
 
                     car.driveTo(newpos);
 
-                    freeSpace(curpos.row, curpos.col, no);
+                    freeSpace(curpos.row, curpos.col);
 
                     if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
                         alley.enter(no);
+                        inAlley = true;
                     }
 
                     if (no <= 4) {
                         if (curpos.row == 9 && curpos.col == 0) {
                             alley.leave(no);
+                            inAlley = false;
                         }
                     }
                     if (no >= 5) {
                         if (curpos.row == 0 && curpos.col == 2) {
                             alley.leave(no);
+                            inAlley = false;
                         }
                     }
 
@@ -178,9 +187,13 @@ class Conductor extends Thread {
                 } else {
                     if (!hasBeenRemoved) {
                         cd.deregister(car);
-                        freeSpace(newpos.row, newpos.col, no);
+                        if(inAlley) {
+                            alley.leave(no);
+                        }
+                        freeSpace(newpos.row, newpos.col);
                         hasBeenRemoved = true;
                     }
+                    // for some reason cars wont be restored unless there is some line here
                     System.out.println("this has to be here to work");
                     if (restoreCarBoolean[no]) {
                         System.out.println("Registering car: " + no);
@@ -188,6 +201,10 @@ class Conductor extends Thread {
                         hasBeenRemoved = false;
                         restoreCarBoolean[no] = false;
                         // curpos = startpos;
+                        takeSpace(curpos.row, curpos.col);
+                        if(inAlley) {
+                            alley.enter(no);
+                        }
                         cd.register(car);
                     }
                 }
@@ -289,10 +306,14 @@ public class CarControl implements CarControlI{
             }
             else if (LowerPassageAllowed && no<=4) {
                 if(oneWaiting) {
-                    wait();
+                    while(!HigherPassageAllowed) {
+                        wait();
+                    }
                 } else {
                     oneWaiting = true;
-                    wait();
+                    while(!HigherPassageAllowed) {
+                        wait();
+                    }
                 }
                 HigherPassageAllowed = true;
                 LowerPassageAllowed = false;
@@ -300,7 +321,9 @@ public class CarControl implements CarControlI{
 
             }
             else if (HigherPassageAllowed && no>=5) {
-                wait();
+                while(!LowerPassageAllowed) {
+                    wait();
+                }
                 HigherPassageAllowed = false;
                 LowerPassageAllowed = true;
             }
