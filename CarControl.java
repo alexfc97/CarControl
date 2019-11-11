@@ -123,6 +123,8 @@ class Conductor extends Thread {
         if(!removeCarBoolean[no]) {
             System.out.println("This is happening while waiting for space to free up");
             removeCarBoolean[no] = true;
+            freeSpace(newpos.row, newpos.col);
+//            alley.notify();
         } else {
             cd.println("Car already removed");
         }
@@ -141,6 +143,7 @@ class Conductor extends Thread {
             curpos = startpos;
             cd.register(car);
             boolean hasBeenRemoved = false;
+            boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
 
             while (true) {
@@ -155,46 +158,55 @@ class Conductor extends Thread {
 
                     takeSpace(newpos.row, newpos.col);
 
-                    car.driveTo(newpos);
+                    if(!removeCarBoolean[no]) {
+                        car.driveTo(newpos);
 
-                    freeSpace(curpos.row, curpos.col);
+                        freeSpace(curpos.row, curpos.col);
 
-                    if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
-                        alley.enter(no);
-                        inAlley = true;
-                    }
-
-                    if (no <= 4) {
-                        if (curpos.row == 9 && curpos.col == 0) {
-                            alley.leave(no);
-                            inAlley = false;
+                        if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
+                            alley.enter(no);
+                            inAlley = true;
                         }
-                    }
-                    if (no >= 5) {
-                        if (curpos.row == 0 && curpos.col == 2) {
-                            alley.leave(no);
-                            inAlley = false;
-                        }
-                    }
 
-                    if (barrier.barrierActivated) {
-                        if(atBarrier(newpos)) {
-                            barrier.sync(no);
+                        if (no <= 4) {
+                            if (curpos.row == 9 && curpos.col == 0) {
+                                alley.leave(no);
+                                inAlley = false;
+                            }
                         }
-                    }
+                        if (no >= 5) {
+                            if (curpos.row == 0 && curpos.col == 2) {
+                                alley.leave(no);
+                                inAlley = false;
+                            }
+                        }
 
-                    curpos = newpos;
+                        if (barrier.barrierActivated) {
+                            if (atBarrier(newpos)) {
+                                barrier.sync(no);
+                            }
+                        }
+
+                        curpos = newpos;
+                    } else {
+                        removedWhileWaitingForTile = true;
+                    }
                 } else {
                     if (!hasBeenRemoved) {
                         cd.deregister(car);
                         if(inAlley) {
                             alley.leave(no);
                         }
-                        freeSpace(newpos.row, newpos.col);
+                        if(removedWhileWaitingForTile) {
+                            freeSpace(curpos.row, curpos.col);
+                            removedWhileWaitingForTile = false;
+                        } else {
+                            freeSpace(newpos.row, newpos.col);
+                        }
                         hasBeenRemoved = true;
                     }
                     // for some reason cars wont be restored unless there is some line here
-                    System.out.println("this has to be here to work");
+                   // System.out.println("this has to be here to work");
                     if (restoreCarBoolean[no]) {
                         System.out.println("Registering car: " + no);
                         removeCarBoolean[no] = false;
