@@ -119,12 +119,16 @@ class Conductor extends Thread {
     public void freeSpace(int row, int col) {
         sFields[row][col].V();
     }
-    public void removeCar(int no) {
+    public synchronized void removeCar(int no) {
         if(!removeCarBoolean[no]) {
             System.out.println("This is happening while waiting for space to free up");
             removeCarBoolean[no] = true;
             freeSpace(newpos.row, newpos.col);
-//            alley.notify();
+            try {
+                alley.wakeUpForRemoval();
+            } catch (Exception e) {
+                cd.println("Exception in Car no. " + no);
+            }
         } else {
             cd.println("Car already removed");
         }
@@ -158,6 +162,7 @@ class Conductor extends Thread {
 
                     takeSpace(newpos.row, newpos.col);
 
+                    // if the car has been woken up from takeSpace to be removed it is supposed to skip rest of this segment
                     if(!removeCarBoolean[no]) {
                         car.driveTo(newpos);
 
@@ -206,7 +211,7 @@ class Conductor extends Thread {
                         hasBeenRemoved = true;
                     }
                     // for some reason cars wont be restored unless there is some line here
-                   // System.out.println("this has to be here to work");
+                    System.out.println("this has to be here to work");
                     if (restoreCarBoolean[no]) {
                         System.out.println("Registering car: " + no);
                         removeCarBoolean[no] = false;
@@ -250,9 +255,9 @@ public class CarControl implements CarControlI{
             removeCarBoolean[i] = false;
     }
 
-    public void initRestoreCarBooleans(Boolean[] removeCarBoolean) {
+    public void initRestoreCarBooleans(Boolean[] restoreCarBoolean) {
         for (int i = 0; i <= 8; i++)
-            removeCarBoolean[i] = false;
+            restoreCarBoolean[i] = false;
     }
 
     class Barrier {
@@ -349,6 +354,13 @@ public class CarControl implements CarControlI{
                 HigherPassageAllowed = true;
                 notifyAll();
             }
+            if(conductor[no].removeCarBoolean[no] && no > 4) {
+                notifyAll();
+            }
+        }
+        // for testing should probably be removed later
+        public synchronized void wakeUpForRemoval() {
+            notifyAll();
         }
     }
 
