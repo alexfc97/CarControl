@@ -5,6 +5,7 @@
 //Hans Henrik Lovengreen       Oct 8, 2019
 
 import java.awt.Color;
+import java.util.concurrent.TimeUnit;
 
 class Gate {
 
@@ -116,10 +117,12 @@ class Conductor extends Thread {
     public void takeSpace(int row, int col) throws InterruptedException {
         sFields[row][col].P();
     }
+
     public void freeSpace(int row, int col) {
         sFields[row][col].V();
     }
-    public synchronized void removeCar(int no) {
+
+    public void removeCar(int no) {
         if(!removeCarBoolean[no]) {
             removeCarBoolean[no] = true;
             try {
@@ -210,7 +213,7 @@ class Conductor extends Thread {
                         hasBeenRemoved = true;
                     }
                     // for some reason cars wont be restored unless there is some line here
-                    System.out.println("this has to be here to work");
+                    TimeUnit.MICROSECONDS.sleep(1);
                     if (restoreCarBoolean[no]) {
                         removeCarBoolean[no] = false;
                         hasBeenRemoved = false;
