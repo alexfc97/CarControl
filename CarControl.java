@@ -6,6 +6,7 @@
 
 import java.awt.Color;
 
+@SuppressWarnings("all")
 class Gate {
 
     Semaphore g = new Semaphore(0);
@@ -34,7 +35,7 @@ class Gate {
 }
 
 // opret array med semaphores, som tilsvarer antal felter som en bil tager når det kører ind i det
-
+@SuppressWarnings("all")
 class Conductor extends Thread {
 
     double basespeed = 6.0;          // Tiles per second
@@ -53,15 +54,17 @@ class Conductor extends Thread {
     Semaphore[][] sFields;
     CarControl.Alley alley;
     CarControl.Barrier barrier;
+    CarControl.Bridge bridge;
 
 
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier) {
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, CarControl.Bridge bridge) {
 
         this.no = no;
         this.cd = cd;
         this.sFields = sFields;
         this.alley = alley;
         this.barrier = barrier;
+        this.bridge = bridge;
         mygate = g;
 
         startpos = cd.getStartPos(no);
@@ -134,6 +137,23 @@ class Conductor extends Thread {
 
                 freeSpace(curpos.row, curpos.col, no);
 
+                if ( no < 5 && newpos.row == 9 && newpos.col == 0 ) {
+                    bridge.enter(no);
+                }
+                else if ( no > 4 && newpos.row == 10 && newpos.col == 4 ) {
+                    bridge.enter(no);
+                }
+                else if ( no < 5 && curpos.row == 9 && curpos.col == 3 ) {
+                    bridge.leave(no, newpos.row, newpos.col);
+                }
+                else if ( no > 4 && curpos.row == 10 && curpos.col == 1 ){
+                    bridge.leave(no, newpos.row , newpos.col);
+                }
+
+                if (newpos.row == 9 && newpos.col == 0 && no > 4){
+                    bridge.CarWaiting = false;
+                };
+
                 if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
                     alley.enter(no);
                 }
@@ -159,6 +179,7 @@ class Conductor extends Thread {
                 }
 
                 curpos = newpos;
+
             }
 
         } catch (Exception e) {
@@ -169,7 +190,7 @@ class Conductor extends Thread {
     }
 
 }
-
+@SuppressWarnings("all")
 public class CarControl implements CarControlI{
 
     public void initSemFields(Semaphore[][] sFields) {
@@ -184,7 +205,44 @@ public class CarControl implements CarControlI{
             barrierSemaphore[i] = new Semaphore(0);
     }
 
+    class Bridge {
+        int limit;
+        int carsatbridge = 0;
+        boolean CarWaiting = false;
+
+        public synchronized void enter(int no) throws InterruptedException {
+            if(carsatbridge >= limit){
+                wait();
+            }
+            else if (CarWaiting && no > 4){
+                while(CarWaiting) {
+                    wait();
+                }
+                CarWaiting = false;
+            }
+            carsatbridge++;
+        }
+
+        public synchronized void leave(int no, int row, int col){
+            if (row==10 && col==0 && no > 4) {
+                CarWaiting = true;
+            }
+            notify();
+            carsatbridge--;
+        }
+
+        public synchronized void setLimit(int k){
+            if (k > limit) {
+                for ( int i = 0 ; i < k-limit ; i++){
+                    notify();
+                }
+            }
+            this.limit = k;
+        }
+    }
+
     class Barrier {
+
         boolean barrierActivated = false;
         int carsAtBarrier = 0;
 
@@ -266,6 +324,7 @@ public class CarControl implements CarControlI{
     Semaphore[] barrierSemaphore = new Semaphore[9];
     Alley alleysync = new Alley();
     Barrier barrier = new Barrier();
+    Bridge bridge = new Bridge();
 
     public CarControl(CarDisplayI cd) {
         this.cd = cd;
@@ -277,7 +336,7 @@ public class CarControl implements CarControlI{
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, bridge);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
@@ -300,7 +359,7 @@ public class CarControl implements CarControlI{
     }
 
     public void setLimit(int k) {
-        cd.println("Setting of bridge limit not implemented in this version");
+        bridge.setLimit(k);
     }
 
     public void barrierShutDown() {
