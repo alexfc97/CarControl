@@ -6,6 +6,7 @@
 
 import java.awt.Color;
 
+@SuppressWarnings("all")
 class Gate {
 
     Semaphore g = new Semaphore(0);
@@ -34,7 +35,7 @@ class Gate {
 }
 
 // opret array med semaphores, som tilsvarer antal felter som en bil tager når det kører ind i det
-
+@SuppressWarnings("all")
 class Conductor extends Thread {
 
     double basespeed = 6.0;          // Tiles per second
@@ -53,17 +54,18 @@ class Conductor extends Thread {
     Semaphore[][] sFields;
     CarControl.Alley alley;
     CarControl.Barrier barrier;
+    CarControl.Bridge bridge;
     Boolean[] removeCarBoolean;
     Boolean[] restoreCarBoolean;
-
-
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, Boolean[] removeCarBoolean, Boolean[] restoreCarBoolean) {
+  
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, Boolean[] removeCarBoolean, Boolean[] restoreCarBoolean, CarControl.Bridge bridge) {
 
         this.no = no;
         this.cd = cd;
         this.sFields = sFields;
         this.alley = alley;
         this.barrier = barrier;
+        this.bridge = bridge;
         this.removeCarBoolean = removeCarBoolean;
         this.restoreCarBoolean = restoreCarBoolean;
         mygate = g;
@@ -155,6 +157,7 @@ class Conductor extends Thread {
                     if (atGate(curpos)) {
                         mygate.pass();
                         car.setSpeed(chooseSpeed());
+
                     }
 
                     newpos = nextPos(curpos);
@@ -166,6 +169,23 @@ class Conductor extends Thread {
                         car.driveTo(newpos);
 
                         freeSpace(curpos.row, curpos.col);
+                      
+                       if ( no < 5 && newpos.row == 9 && newpos.col == 0 ) {
+                    bridge.enter(no);
+                }
+                else if ( no > 4 && newpos.row == 10 && newpos.col == 4 ) {
+                    bridge.enter(no);
+                }
+                else if ( no < 5 && curpos.row == 9 && curpos.col == 3 ) {
+                    bridge.leave(no, newpos.row, newpos.col);
+                }
+                else if ( no > 4 && curpos.row == 10 && curpos.col == 1 ){
+                    bridge.leave(no, newpos.row , newpos.col);
+                }
+
+                if (newpos.row == 9 && newpos.col == 0 && no > 4){
+                    bridge.leaving();
+                };
 
                         if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
                             alley.enter(no);
@@ -221,6 +241,9 @@ class Conductor extends Thread {
                         cd.register(car);
                     }
                 }
+
+                curpos = newpos;
+
             }
 
         } catch (Exception e) {
@@ -231,7 +254,7 @@ class Conductor extends Thread {
     }
 
 }
-
+@SuppressWarnings("all")
 public class CarControl implements CarControlI{
 
     public void initSemFields(Semaphore[][] sFields) {
@@ -246,6 +269,45 @@ public class CarControl implements CarControlI{
             barrierSemaphore[i] = new Semaphore(0);
     }
 
+    class Bridge {
+        int limit;
+        int carsatbridge = 0;
+        boolean CarWaiting = false;
+
+        public synchronized void enter(int no) throws InterruptedException {
+            while (carsatbridge >= limit){
+                wait();
+            }
+            if (CarWaiting && no > 4){
+                while(CarWaiting || carsatbridge >= limit) {
+                    wait();
+                }
+                CarWaiting = false;
+            }
+            carsatbridge++;
+        }
+
+        public synchronized void leave(int no, int row, int col){
+            if (row==10 && col==0 && no > 4) {
+                CarWaiting = true;
+            }
+            notifyAll();
+            carsatbridge--;
+        }
+
+        public synchronized void leaving(){
+            CarWaiting = false;
+            notifyAll();
+        }
+
+        public synchronized void setLimit(int k){
+            if (k > limit) {
+                for ( int i = 0 ; i < k-limit ; i++){
+                    notify();
+                }
+            }
+            this.limit = k;
+        }
     public void initRemoveCarBooleans(Boolean[] removeCarBoolean) {
         for (int i = 0; i <= 8; i++)
             removeCarBoolean[i] = false;
@@ -257,6 +319,7 @@ public class CarControl implements CarControlI{
     }
 
     class Barrier {
+
         boolean barrierActivated = false;
         boolean barrierShutDown = false;
         int carsAtBarrier = 0;
@@ -372,6 +435,7 @@ public class CarControl implements CarControlI{
     Boolean[] restoreCarBoolean = new Boolean[9];
     Alley alleysync = new Alley();
     Barrier barrier = new Barrier();
+    Bridge bridge = new Bridge();
 
     public CarControl(CarDisplayI cd) {
         this.cd = cd;
@@ -385,7 +449,7 @@ public class CarControl implements CarControlI{
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, removeCarBoolean, restoreCarBoolean);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, removeCarBoolean, restoreCarBoolean,bridge);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
@@ -408,7 +472,7 @@ public class CarControl implements CarControlI{
     }
 
     public void setLimit(int k) {
-        cd.println("Setting of bridge limit not implemented in this version");
+        bridge.setLimit(k);
     }
 
     public void barrierShutDown() {
