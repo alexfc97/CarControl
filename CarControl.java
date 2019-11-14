@@ -148,7 +148,6 @@ class Conductor extends Thread {
             boolean hasBeenRemoved = false;
             boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
-            boolean removedWhileAlleySync = false;
 
             while (true) {
 
@@ -172,8 +171,6 @@ class Conductor extends Thread {
                             alley.enter(no);
                             if(!removeCarBoolean[no]) {
                                 inAlley = true;
-                            } else {
-                                removedWhileAlleySync = true;
                             }
                         }
 
@@ -209,8 +206,6 @@ class Conductor extends Thread {
                         if(removedWhileWaitingForTile) {
                             freeSpace(curpos.row, curpos.col);
                             removedWhileWaitingForTile = false;
-                        } else if (removedWhileAlleySync){
-                            removedWhileAlleySync = false;
                         }
                         hasBeenRemoved = true;
                     }
@@ -223,10 +218,6 @@ class Conductor extends Thread {
                         car = cd.newCar(no, col, startpos);
                         curpos = startpos;
                         takeSpace(curpos.row, curpos.col);
-                        // enable if doing step 6G
-                        /*if(inAlley) {
-                            alley.enter(no);
-                        }*/
                         cd.register(car);
                     }
                 }
