@@ -121,14 +121,13 @@ class Conductor extends Thread {
     }
     public synchronized void removeCar(int no) {
         if(!removeCarBoolean[no]) {
-            System.out.println("This is happening while waiting for space to free up");
             removeCarBoolean[no] = true;
-            freeSpace(newpos.row, newpos.col);
             try {
                 alley.wakeUpForRemoval();
             } catch (Exception e) {
                 cd.println("Exception in Car no. " + no);
             }
+            freeSpace(newpos.row, newpos.col);
         } else {
             cd.println("Car already removed");
         }
@@ -149,6 +148,7 @@ class Conductor extends Thread {
             boolean hasBeenRemoved = false;
             boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
+            boolean removedWhileAlleySync = false;
 
             while (true) {
 
@@ -170,7 +170,11 @@ class Conductor extends Thread {
 
                         if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
                             alley.enter(no);
-                            inAlley = true;
+                            if(!removeCarBoolean[no]) {
+                                inAlley = true;
+                            } else {
+                                removedWhileAlleySync = true;
+                            }
                         }
 
                         if (no <= 4) {
@@ -205,23 +209,24 @@ class Conductor extends Thread {
                         if(removedWhileWaitingForTile) {
                             freeSpace(curpos.row, curpos.col);
                             removedWhileWaitingForTile = false;
-                        } else {
-                            freeSpace(newpos.row, newpos.col);
+                        } else if (removedWhileAlleySync){
+                            removedWhileAlleySync = false;
                         }
                         hasBeenRemoved = true;
                     }
                     // for some reason cars wont be restored unless there is some line here
                     System.out.println("this has to be here to work");
                     if (restoreCarBoolean[no]) {
-                        System.out.println("Registering car: " + no);
                         removeCarBoolean[no] = false;
                         hasBeenRemoved = false;
                         restoreCarBoolean[no] = false;
-                        // curpos = startpos;
+                        car = cd.newCar(no, col, startpos);
+                        curpos = startpos;
                         takeSpace(curpos.row, curpos.col);
-                        if(inAlley) {
+                        // enable if doing step 6G
+                        /*if(inAlley) {
                             alley.enter(no);
-                        }
+                        }*/
                         cd.register(car);
                     }
                 }
@@ -302,7 +307,6 @@ public class CarControl implements CarControlI{
                 cd.println("Barrier is not activated");
             }
         }
-
     }
 
     class Alley {
@@ -323,28 +327,34 @@ public class CarControl implements CarControlI{
             }
             else if (LowerPassageAllowed && no<=4) {
                 if(oneWaiting) {
-                    while(!HigherPassageAllowed) {
+                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
                         wait();
                     }
                 } else {
                     oneWaiting = true;
-                    while(!HigherPassageAllowed) {
+                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
                         wait();
                     }
                 }
-                HigherPassageAllowed = true;
-                LowerPassageAllowed = false;
+                if(!removeCarBoolean[no]) {
+                    HigherPassageAllowed = true;
+                    LowerPassageAllowed = false;
+                }
                 oneWaiting = false;
 
             }
             else if (HigherPassageAllowed && no>=5) {
-                while(!LowerPassageAllowed) {
+                while(!LowerPassageAllowed && !removeCarBoolean[no]) {
                     wait();
                 }
-                HigherPassageAllowed = false;
-                LowerPassageAllowed = true;
+                if(!removeCarBoolean[no]) {
+                    HigherPassageAllowed = false;
+                    LowerPassageAllowed = true;
+                }
             }
-            carsInValley++;
+            if(!removeCarBoolean[no]) {
+                carsInValley++;
+            }
         }
 
         public synchronized void leave(int no) throws InterruptedException {
@@ -354,11 +364,9 @@ public class CarControl implements CarControlI{
                 HigherPassageAllowed = true;
                 notifyAll();
             }
-            if(conductor[no].removeCarBoolean[no] && no > 4) {
-                notifyAll();
-            }
+
         }
-        // for testing should probably be removed later
+
         public synchronized void wakeUpForRemoval() {
             notifyAll();
         }
