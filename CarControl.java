@@ -55,9 +55,10 @@ class Conductor extends Thread {
     CarControl.Alley alley;
     CarControl.Barrier barrier;
     CarControl.Bridge bridge;
-
-
-    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, CarControl.Bridge bridge) {
+    Boolean[] removeCarBoolean;
+    Boolean[] restoreCarBoolean;
+  
+    public Conductor(int no, CarDisplayI cd, Gate g, Semaphore[][] sFields, CarControl.Alley alley, CarControl.Barrier barrier, Boolean[] removeCarBoolean, Boolean[] restoreCarBoolean, CarControl.Bridge bridge) {
 
         this.no = no;
         this.cd = cd;
@@ -65,6 +66,8 @@ class Conductor extends Thread {
         this.alley = alley;
         this.barrier = barrier;
         this.bridge = bridge;
+        this.removeCarBoolean = removeCarBoolean;
+        this.restoreCarBoolean = restoreCarBoolean;
         mygate = g;
 
         startpos = cd.getStartPos(no);
@@ -108,12 +111,35 @@ class Conductor extends Thread {
     boolean atGate(Pos pos) {
         return pos.equals(startpos);
     }
+    boolean atBarrier(Pos pos) {
+        return pos.equals(barpos);
+    }
 
-    public void takeSpace(int row, int col, int no) throws InterruptedException {
+    public void takeSpace(int row, int col) throws InterruptedException {
         sFields[row][col].P();
     }
-    public void freeSpace(int row, int col, int no) throws InterruptedException {
+    public void freeSpace(int row, int col) {
         sFields[row][col].V();
+    }
+    public synchronized void removeCar(int no) {
+        if(!removeCarBoolean[no]) {
+            removeCarBoolean[no] = true;
+            try {
+                alley.wakeUpForRemoval();
+            } catch (Exception e) {
+                cd.println("Exception in Car no. " + no);
+            }
+            freeSpace(newpos.row, newpos.col);
+        } else {
+            cd.println("Car already removed");
+        }
+    }
+    public void restoreCar(int no) {
+        if(removeCarBoolean[no]) {
+            restoreCarBoolean[no] = true;
+        } else {
+            cd.println("Car already registered");
+        }
     }
 
     public void run() {
@@ -121,23 +147,30 @@ class Conductor extends Thread {
             CarI car = cd.newCar(no, col, startpos);
             curpos = startpos;
             cd.register(car);
+            boolean hasBeenRemoved = false;
+            boolean removedWhileWaitingForTile = false;
+            boolean inAlley = false;
 
             while (true) {
 
-                if (atGate(curpos)) {
-                    mygate.pass();
-                    car.setSpeed(chooseSpeed());
-                }
+                if(!removeCarBoolean[no]) {
+                    if (atGate(curpos)) {
+                        mygate.pass();
+                        car.setSpeed(chooseSpeed());
 
-                newpos = nextPos(curpos);
+                    }
 
-                takeSpace(newpos.row, newpos.col, no);
+                    newpos = nextPos(curpos);
 
-                car.driveTo(newpos);
+                    takeSpace(newpos.row, newpos.col);
 
-                freeSpace(curpos.row, curpos.col, no);
+                    // if the car has been woken up from takeSpace to be removed it is supposed to skip rest of this segment
+                    if(!removeCarBoolean[no]) {
+                        car.driveTo(newpos);
 
-                if ( no < 5 && newpos.row == 9 && newpos.col == 0 ) {
+                        freeSpace(curpos.row, curpos.col);
+                      
+                       if ( no < 5 && newpos.row == 9 && newpos.col == 0 ) {
                     bridge.enter(no);
                 }
                 else if ( no > 4 && newpos.row == 10 && newpos.col == 4 ) {
@@ -154,27 +187,58 @@ class Conductor extends Thread {
                     bridge.leaving();
                 };
 
-                if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
-                    alley.enter(no);
-                }
+                        if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
+                            alley.enter(no);
+                            if(!removeCarBoolean[no]) {
+                                inAlley = true;
+                            }
+                        }
 
-                if (no<=4) {
-                    if(curpos.row==9 && curpos.col==0) {
-                        alley.leave(no);
-                    }
-                }
-                if (no>=5) {
-                    if(curpos.row==0 && curpos.col==2) {
-                        alley.leave(no);
-                    }
-                }
+                        if (no <= 4) {
+                            if (curpos.row == 9 && curpos.col == 0) {
+                                alley.leave(no);
+                                inAlley = false;
+                            }
+                        }
+                        if (no >= 5) {
+                            if (curpos.row == 0 && curpos.col == 2) {
+                                alley.leave(no);
+                                inAlley = false;
+                            }
+                        }
 
-                if(barrier.barrierActivated) {
-                    if(no>=5 && newpos.row==5 && newpos.col>7) {
-                        barrier.sync(no);
+                        if (barrier.barrierActivated) {
+                            if (atBarrier(newpos)) {
+                                barrier.sync(no);
+                            }
+                        }
+
+                        curpos = newpos;
+                    } else {
+                        removedWhileWaitingForTile = true;
                     }
-                    else if (no<=4 && newpos.row==6 && newpos.col>2) {
-                        barrier.sync(no);
+                } else {
+                    if (!hasBeenRemoved) {
+                        cd.deregister(car);
+                        if(inAlley) {
+                            alley.leave(no);
+                        }
+                        if(removedWhileWaitingForTile) {
+                            freeSpace(curpos.row, curpos.col);
+                            removedWhileWaitingForTile = false;
+                        }
+                        hasBeenRemoved = true;
+                    }
+                    // for some reason cars wont be restored unless there is some line here
+                    System.out.println("this has to be here to work");
+                    if (restoreCarBoolean[no]) {
+                        removeCarBoolean[no] = false;
+                        hasBeenRemoved = false;
+                        restoreCarBoolean[no] = false;
+                        car = cd.newCar(no, col, startpos);
+                        curpos = startpos;
+                        takeSpace(curpos.row, curpos.col);
+                        cd.register(car);
                     }
                 }
 
@@ -244,11 +308,20 @@ public class CarControl implements CarControlI{
             }
             this.limit = k;
         }
+    public void initRemoveCarBooleans(Boolean[] removeCarBoolean) {
+        for (int i = 0; i <= 8; i++)
+            removeCarBoolean[i] = false;
+    }
+
+    public void initRestoreCarBooleans(Boolean[] restoreCarBoolean) {
+        for (int i = 0; i <= 8; i++)
+            restoreCarBoolean[i] = false;
     }
 
     class Barrier {
 
         boolean barrierActivated = false;
+        boolean barrierShutDown = false;
         int carsAtBarrier = 0;
 
         // Wait for others to arrive (if barrier active)
@@ -274,6 +347,20 @@ public class CarControl implements CarControlI{
             carsAtBarrier = 0;
         }
 
+        public synchronized void shutDown() {
+            barrierShutDown = true;
+            if(barrierActivated) {
+                try {
+                    wait();
+                    barrierShutDown = false;
+                    off();
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+            } else {
+                cd.println("Barrier is not activated");
+            }
+        }
     }
 
     class Alley {
@@ -294,22 +381,34 @@ public class CarControl implements CarControlI{
             }
             else if (LowerPassageAllowed && no<=4) {
                 if(oneWaiting) {
-                    wait();
+                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
+                        wait();
+                    }
                 } else {
                     oneWaiting = true;
-                    wait();
+                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
+                        wait();
+                    }
                 }
-                HigherPassageAllowed = true;
-                LowerPassageAllowed = false;
+                if(!removeCarBoolean[no]) {
+                    HigherPassageAllowed = true;
+                    LowerPassageAllowed = false;
+                }
                 oneWaiting = false;
 
             }
             else if (HigherPassageAllowed && no>=5) {
-                wait();
-                HigherPassageAllowed = false;
-                LowerPassageAllowed = true;
+                while(!LowerPassageAllowed && !removeCarBoolean[no]) {
+                    wait();
+                }
+                if(!removeCarBoolean[no]) {
+                    HigherPassageAllowed = false;
+                    LowerPassageAllowed = true;
+                }
             }
-            carsInValley++;
+            if(!removeCarBoolean[no]) {
+                carsInValley++;
+            }
         }
 
         public synchronized void leave(int no) throws InterruptedException {
@@ -319,6 +418,11 @@ public class CarControl implements CarControlI{
                 HigherPassageAllowed = true;
                 notifyAll();
             }
+
+        }
+
+        public synchronized void wakeUpForRemoval() {
+            notifyAll();
         }
     }
 
@@ -327,6 +431,8 @@ public class CarControl implements CarControlI{
     Gate[] gate;              // Gates
     Semaphore[][] sFields = new Semaphore[11][12];
     Semaphore[] barrierSemaphore = new Semaphore[9];
+    Boolean[] removeCarBoolean = new Boolean[9];
+    Boolean[] restoreCarBoolean = new Boolean[9];
     Alley alleysync = new Alley();
     Barrier barrier = new Barrier();
     Bridge bridge = new Bridge();
@@ -338,10 +444,12 @@ public class CarControl implements CarControlI{
 
         initSemFields(sFields);
         initBarrierSemaphore(barrierSemaphore);
+        initRemoveCarBooleans(removeCarBoolean);
+        initRestoreCarBooleans(restoreCarBoolean);
 
         for (int no = 0; no < 9; no++) {
             gate[no] = new Gate();
-            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, bridge);
+            conductor[no] = new Conductor(no,cd,gate[no], sFields, alleysync, barrier, removeCarBoolean, restoreCarBoolean,bridge);
             conductor[no].setName("Conductor-" + no);
             conductor[no].start();
         }
@@ -368,20 +476,15 @@ public class CarControl implements CarControlI{
     }
 
     public void barrierShutDown() {
-        cd.println("Barrier shut down not implemented in this version");
-        // This sleep is for illustrating how blocking affects the GUI
-        // Remove when shutdown is implemented.
-        try { Thread.sleep(3000); } catch (InterruptedException e) { }
-        // Recommendation:
-        //   If not implemented call barrier.off() instead to make graphics consistent
+        barrier.shutDown();
     }
 
     public void removeCar(int no) {
-        cd.println("Remove Car not implemented in this version");
+        conductor[no].removeCar(no);
     }
 
     public void restoreCar(int no) {
-        cd.println("Restore Car not implemented in this version");
+        conductor[no].restoreCar(no);
     }
 
     /* Speed settings for testing purposes */
