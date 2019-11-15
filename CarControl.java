@@ -192,7 +192,7 @@ class Conductor extends Thread {
 
                         if (barrier.barrierActivated) {
                             if (atBarrier(newpos)) {
-                                barrier.sync(no);
+                                barrier.sync();
                             }
                         }
 
@@ -262,115 +262,134 @@ public class CarControl implements CarControlI{
     class Barrier {
         boolean barrierActivated = false;
         boolean barrierShutDown = false;
+        boolean allowedToGo = false;
         int carsAtBarrier = 0;
+        int carsLeft = 0;
 
         // Wait for others to arrive (if barrier active)
-        public synchronized void sync(int no) throws InterruptedException {
-            carsAtBarrier++;
-            if(carsAtBarrier==9) {
-                if(!barrierShutDown) {
-                    notifyAll();
-                } else {
-                    barrierShutDown = false;
-                    notifyAll();
-                }
-                carsAtBarrier=0;
-            } else {
-                wait();
-            }
-        }
-
-        // Activate barrier
-        public void on() {
-            barrierActivated = true;
-        }
-
-        // Deactivate barrier
-        public synchronized void off() {
-            barrierActivated = false;
-            notifyAll();
-            carsAtBarrier = 0;
-        }
-
-        public synchronized void shutDown() {
-            barrierShutDown = true;
-            if(barrierActivated) {
-                try {
-                    while(barrierShutDown) {
-                        wait();
-                    }
-                    off();
-                } catch (Exception e) {
-                    System.out.println(e);
-                }
-            } else {
-                cd.println("Barrier is not activated");
-            }
-        }
-    }
-
-    class Alley {
-
-        int carsInValley = 0;
-        boolean LowerPassageAllowed = true;
-        boolean HigherPassageAllowed = true;
-        boolean oneWaiting = false;
-
-        public synchronized void enter(int no) throws InterruptedException {
-            if(LowerPassageAllowed && HigherPassageAllowed) {
-                if(no<=4) {
-                    LowerPassageAllowed = false;
-                }
-                else {
-                    HigherPassageAllowed = false;
-                }
-            }
-            else if (LowerPassageAllowed && no<=4) {
-                if(oneWaiting) {
-                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
-                        wait();
-                    }
-                } else {
-                    oneWaiting = true;
-                    while(!HigherPassageAllowed && !removeCarBoolean[no]) {
-                        wait();
-                    }
-                }
-                if(!removeCarBoolean[no]) {
-                    HigherPassageAllowed = true;
-                    LowerPassageAllowed = false;
-                }
-                oneWaiting = false;
-
-            }
-            else if (HigherPassageAllowed && no>=5) {
-                while(!LowerPassageAllowed && !removeCarBoolean[no]) {
+        public synchronized void sync() throws InterruptedException {
+            if(carsLeft!=0 && carsAtBarrier==0) {
+                while(carsLeft!=0) {
                     wait();
                 }
-                if(!removeCarBoolean[no]) {
-                    HigherPassageAllowed = false;
-                    LowerPassageAllowed = true;
+            }
+            if(carsAtBarrier==0) {
+                allowedToGo=false;
+            }
+            carsAtBarrier++;
+            if(carsAtBarrier==9) {
+                carsAtBarrier=0;
+                if(!barrierShutDown) {
+                    allowedToGo=true;
+                    notifyAll();
+                } else {
+                    allowedToGo=true;
+                    barrierShutDown = false;
+                    barrierActivated = false;
+                    notifyAll();
+                }
+            } else {
+                while(!allowedToGo) {
+                    wait();
+                }
+            }
+            carsLeft++;
+            if(carsLeft==9) {
+                carsLeft=0;
+                notifyAll();
+            }
+        }
+
+    // Activate barrier
+    public void on() {
+        barrierActivated = true;
+    }
+
+    // Deactivate barrier
+    public synchronized void off() {
+        barrierActivated = false;
+        notifyAll();
+        carsAtBarrier = 0;
+    }
+
+    public synchronized void shutDown() {
+        barrierShutDown = true;
+        if(barrierActivated) {
+            try {
+                while(barrierShutDown) {
+                    wait();
+                }
+            } catch (Exception e) {
+                System.out.println(e);
+            }
+        } else {
+            cd.println("Barrier is not activated");
+        }
+    }
+}
+
+class Alley {
+
+    int carsInValley = 0;
+    boolean LowerPassageAllowed = true;
+    boolean HigherPassageAllowed = true;
+    boolean oneWaiting = false;
+
+    public synchronized void enter(int no) throws InterruptedException {
+        if(LowerPassageAllowed && HigherPassageAllowed) {
+            if(no<=4) {
+                LowerPassageAllowed = false;
+            }
+            else {
+                HigherPassageAllowed = false;
+            }
+        }
+        else if (LowerPassageAllowed && no<=4) {
+            if(oneWaiting) {
+                while(!HigherPassageAllowed && !removeCarBoolean[no]) {
+                    wait();
+                }
+            } else {
+                oneWaiting = true;
+                while(!HigherPassageAllowed && !removeCarBoolean[no]) {
+                    wait();
                 }
             }
             if(!removeCarBoolean[no]) {
-                carsInValley++;
-            }
-        }
-
-        public synchronized void leave(int no) throws InterruptedException {
-            carsInValley--;
-            if(carsInValley==0) {
-                LowerPassageAllowed = true;
                 HigherPassageAllowed = true;
-                notifyAll();
+                LowerPassageAllowed = false;
             }
+            oneWaiting = false;
 
         }
-
-        public synchronized void wakeUpForRemoval() {
-            notifyAll();
+        else if (HigherPassageAllowed && no>=5) {
+            while(!LowerPassageAllowed && !removeCarBoolean[no]) {
+                wait();
+            }
+            if(!removeCarBoolean[no]) {
+                HigherPassageAllowed = false;
+                LowerPassageAllowed = true;
+            }
+        }
+        if(!removeCarBoolean[no]) {
+            carsInValley++;
         }
     }
+
+    public synchronized void leave(int no) throws InterruptedException {
+        carsInValley--;
+        if(carsInValley==0) {
+            LowerPassageAllowed = true;
+            HigherPassageAllowed = true;
+            notifyAll();
+        }
+
+    }
+
+    public synchronized void wakeUpForRemoval() {
+        notifyAll();
+    }
+}
 
     CarDisplayI cd;           // Reference to GUI
     Conductor[] conductor;    // Car controllers
