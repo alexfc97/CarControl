@@ -107,6 +107,10 @@ class Conductor extends Thread {
         return pos.equals(startpos);
     }
 
+    boolean atBarrier(Pos pos) {
+        return pos.equals(barpos);
+    }
+
     public void takeSpace(int row, int col, int no) throws InterruptedException {
         sFields[row][col].P();
     }
@@ -150,11 +154,8 @@ class Conductor extends Thread {
                     }
                 }
 
-                if(barrier.barrierActivated) {
-                    if(no>=5 && newpos.row==5 && newpos.col>7) {
-                        barrier.sync(no);
-                    }
-                    else if (no<=4 && newpos.row==6 && newpos.col>2) {
+                if (barrier.barrierActivated) {
+                    if (atBarrier(newpos)) {
                         barrier.sync(no);
                     }
                 }
