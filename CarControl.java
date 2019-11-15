@@ -135,6 +135,7 @@ class Conductor extends Thread {
             cd.println("Car already removed");
         }
     }
+
     public void restoreCar(int no) {
         if(removeCarBoolean[no]) {
             restoreCarBoolean[no] = true;
@@ -211,6 +212,7 @@ class Conductor extends Thread {
                             removedWhileWaitingForTile = false;
                         }
                         hasBeenRemoved = true;
+                        cd.println("Removed car: "+ no);
                     }
                     // for some reason cars wont be restored unless there is some line here
                     TimeUnit.MICROSECONDS.sleep(1);
@@ -222,6 +224,7 @@ class Conductor extends Thread {
                         curpos = startpos;
                         takeSpace(curpos.row, curpos.col);
                         cd.register(car);
+                        cd.println("Restored car: " + no);
                     }
                 }
             }
@@ -232,7 +235,6 @@ class Conductor extends Thread {
             e.printStackTrace();
         }
     }
-
 }
 
 public class CarControl implements CarControlI{
@@ -313,8 +315,8 @@ public class CarControl implements CarControlI{
     }
 
     public synchronized void shutDown() {
-        barrierShutDown = true;
         if(barrierActivated) {
+            barrierShutDown = true;
             try {
                 while(barrierShutDown) {
                     wait();
