@@ -268,7 +268,12 @@ public class CarControl implements CarControlI{
         public synchronized void sync(int no) throws InterruptedException {
             carsAtBarrier++;
             if(carsAtBarrier==9) {
-                notifyAll();
+                if(!barrierShutDown) {
+                    notifyAll();
+                } else {
+                    barrierShutDown = false;
+                    notifyAll();
+                }
                 carsAtBarrier=0;
             } else {
                 wait();
@@ -291,8 +296,9 @@ public class CarControl implements CarControlI{
             barrierShutDown = true;
             if(barrierActivated) {
                 try {
-                    wait();
-                    barrierShutDown = false;
+                    while(barrierShutDown) {
+                        wait();
+                    }
                     off();
                 } catch (Exception e) {
                     System.out.println(e);
