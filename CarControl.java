@@ -202,10 +202,10 @@ public class CarControl implements CarControlI{
                 if(barrierShutDown) {
                     shutDown.V();
                 } else {
+                    carsAtBarrier=0;
                     for (int i = 0; i <= 8; i++) {
                         barrierSemaphore[i].V();
                     }
-                    carsAtBarrier=0;
                     carsWaiting.clear();
                 }
                 lock.V();
@@ -227,11 +227,11 @@ public class CarControl implements CarControlI{
         // Deactivate barrier
         public void off() {
             barrierActivated = false;
+            carsAtBarrier = 0;
             for(int cars : carsWaiting) {
                 barrierSemaphore[cars].V();
             }
             carsWaiting.clear();
-            carsAtBarrier = 0;
         }
         public void shutDown() {
             barrierShutDown = true;
@@ -262,7 +262,6 @@ public class CarControl implements CarControlI{
         public void enter(int no) throws InterruptedException {
             lock.P();
             if(LowerPassageAllowed && HigherPassageAllowed) {
-                //System.out.println("at upper and lower: " + no);
                 lock.V();
                 alley.P();
                 lock.P();
