@@ -278,11 +278,9 @@ public class CarControl implements CarControlI{
                         lock.V();
                     }
                 } else {
-                    lock.V();
-                    topSync.P();
-                    lock.P();
                     oneWaiting = true;
                     lock.V();
+                    topSync.P();
                     alley.P();
                     lock.P();
                 }
