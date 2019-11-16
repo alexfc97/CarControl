@@ -226,12 +226,18 @@ public class CarControl implements CarControlI{
 
         // Deactivate barrier
         public void off() {
-            barrierActivated = false;
-            carsAtBarrier = 0;
-            for(int cars : carsWaiting) {
-                barrierSemaphore[cars].V();
+            try {
+                lock.P();
+                barrierActivated = false;
+                carsAtBarrier = 0;
+                for (int cars : carsWaiting) {
+                    barrierSemaphore[cars].V();
+                }
+                carsWaiting.clear();
+                lock.V();
+            } catch (Exception e) {
+                System.out.println(e);
             }
-            carsWaiting.clear();
         }
         public void shutDown() {
             barrierShutDown = true;
