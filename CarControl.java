@@ -107,10 +107,10 @@ class Conductor extends Thread {
         return pos.equals(startpos);
     }
 
-    public void takeSpace(int row, int col, int no) throws InterruptedException {
+    public void takeSpace(int row, int col) throws InterruptedException {
         sFields[row][col].P();
     }
-    public void freeSpace(int row, int col, int no) throws InterruptedException {
+    public void freeSpace(int row, int col) {
         sFields[row][col].V();
     }
 
@@ -129,11 +129,11 @@ class Conductor extends Thread {
 
                 newpos = nextPos(curpos);
 
-                takeSpace(newpos.row, newpos.col, no);
+                takeSpace(newpos.row, newpos.col);
 
                 car.driveTo(newpos);
 
-                freeSpace(curpos.row, curpos.col, no);
+                freeSpace(curpos.row, curpos.col);
 
                 if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
                     alley.enter(no);
@@ -141,12 +141,12 @@ class Conductor extends Thread {
 
                 if (no<=4) {
                     if(curpos.row==9 && curpos.col==0) {
-                        alley.leave(no);
+                        alley.leave();
                     }
                 }
                 if (no>=5) {
                     if(curpos.row==0 && curpos.col==2) {
-                        alley.leave(no);
+                        alley.leave();
                     }
                 }
 
@@ -197,10 +197,10 @@ public class CarControl implements CarControlI{
             carsAtBarrier++;
             carsWaiting.add(no);
             if(carsAtBarrier==9) {
+                carsAtBarrier=0;
                 for (int i = 0; i <= 8; i++) {
                     barrierSemaphore[i].V();
                 }
-                carsAtBarrier=0;
                 carsWaiting.clear();
                 lock.V();
                 barrierSemaphore[no].P();
@@ -215,17 +215,29 @@ public class CarControl implements CarControlI{
 
         // Activate barrier
         public void on() {
-            barrierActivated = true;
+            try {
+                lock.P();
+                barrierActivated = true;
+                lock.V();
+            } catch (Exception e) {
+                System.out.println(e);
+            }
         }
 
         // Deactivate barrier
         public void off() {
-            barrierActivated = false;
-            for(int cars : carsWaiting) {
-                barrierSemaphore[cars].V();
+            try {
+                lock.P();
+                barrierActivated = false;
+                carsAtBarrier = 0;
+                for (int cars : carsWaiting) {
+                    barrierSemaphore[cars].V();
+                }
+                carsWaiting.clear();
+                lock.V();
+            } catch (Exception e) {
+                System.out.println(e);
             }
-            carsWaiting.clear();
-            carsAtBarrier = 0;
         }
 
     }
@@ -243,15 +255,16 @@ public class CarControl implements CarControlI{
         public void enter(int no) throws InterruptedException {
             lock.P();
             if(LowerPassageAllowed && HigherPassageAllowed) {
-                //System.out.println("at upper and lower: " + no);
                 lock.V();
                 alley.P();
                 lock.P();
                 if(no<=4) {
                     LowerPassageAllowed = false;
+                    HigherPassageAllowed = true;
                 }
                 else {
                     HigherPassageAllowed = false;
+                    LowerPassageAllowed = true;
                 }
             }
             else if (LowerPassageAllowed && no<=4) {
@@ -259,9 +272,16 @@ public class CarControl implements CarControlI{
                     lock.V();
                     topSync.P();
                     lock.P();
+                    if(carsInValley==0) {
+                        lock.V();
+                        alley.P();
+                        lock.V();
+                    }
                 } else {
-                    oneWaiting = true;
+                    lock.V();
                     topSync.P();
+                    lock.P();
+                    oneWaiting = true;
                     lock.V();
                     alley.P();
                     lock.P();
@@ -283,7 +303,7 @@ public class CarControl implements CarControlI{
             lock.V();
         }
 
-        public void leave(int no) throws InterruptedException {
+        public void leave() throws InterruptedException {
             lock.P();
             carsInValley--;
             if(carsInValley==0) {
