@@ -202,15 +202,9 @@ public class CarControl implements CarControlI{
                     barrierSemaphore[i].V();
                 }
                 carsWaiting.clear();
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
-            } else {
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
             }
             lock.V();
+            barrierSemaphore[no].P();
         }
 
         // Activate barrier
