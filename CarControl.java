@@ -273,9 +273,11 @@ public class CarControl implements CarControlI{
                 lock.P();
                 if(no<=4) {
                     LowerPassageAllowed = false;
+                    HigherPassageAllowed = true;
                 }
                 else {
                     HigherPassageAllowed = false;
+                    LowerPassageAllowed = true;
                 }
             }
             else if (LowerPassageAllowed && no<=4) {
@@ -283,10 +285,15 @@ public class CarControl implements CarControlI{
                     lock.V();
                     topSync.P();
                     lock.P();
+                    if(carsInValley==0) {
+                        lock.V();
+                        alley.P();
+                        lock.V();
+                    }
                 } else {
                     oneWaiting = true;
-                    topSync.P();
                     lock.V();
+                    topSync.P();
                     alley.P();
                     lock.P();
                 }
