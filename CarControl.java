@@ -208,20 +208,20 @@ public class CarControl implements CarControlI{
                     }
                     carsWaiting.clear();
                 }
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
-            } else {
-                lock.V();
-                barrierSemaphore[no].P();
-                lock.P();
             }
             lock.V();
+            barrierSemaphore[no].P();
         }
 
         // Activate barrier
         public void on() {
-            barrierActivated = true;
+            try {
+                lock.P();
+                barrierActivated = true;
+                lock.V();
+            } catch (Exception e) {
+                System.out.println(e);
+            }
         }
 
         // Deactivate barrier
