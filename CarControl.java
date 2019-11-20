@@ -263,14 +263,12 @@ public class CarControl implements CarControlI{
 
         public synchronized void takeField(int no, int row, int col) {
             try {
-                if(sFields[row][col]) {
-                    sFields[row][col] = false;
-                } else {
+                if(!sFields[row][col]) {
                     while(!sFields[row][col] && !removeCarBoolean[no]) {
                         wait();
                     }
-                    sFields[row][col] = false;
                 }
+                sFields[row][col] = false;
             } catch (Exception e) {
                 System.out.println("Exception in fieldSync: " + e);
             }
