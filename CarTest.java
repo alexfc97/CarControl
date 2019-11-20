@@ -25,6 +25,17 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
+            case 1:
+                // Demonstration of bumping and alley solution
+                cars.startAll();
+                break;
+
+            case 2:
+                // Demonstration of The barrier solution
+                cars.startAll();
+                sleep(1000);
+                cars.barrierOn();
+                break;
             case 19:
                 // Demonstration of speed setting.
                 cars.println("Setting high speeds");
