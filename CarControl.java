@@ -241,7 +241,7 @@ public class CarControl implements CarControlI{
         }
         public void shutDown() {
             if (barrierActivated) {
-            barrierShutDown = true;
+                barrierShutDown = true;
                 try {
                     shutDown.P();
                     barrierShutDown = false;
