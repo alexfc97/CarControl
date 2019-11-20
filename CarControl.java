@@ -150,10 +150,6 @@ class Conductor extends Thread {
                     bridge.leave(no, newpos.row , newpos.col);
                 }
 
-                if (newpos.row == 9 && newpos.col == 0 && no > 4){
-                    bridge.leaving();
-                };
-
                 if((newpos.row==10 && newpos.col==0) || (newpos.row==2 && newpos.col==1) || (newpos.row==1 && newpos.col==3)) {
                     alley.enter(no);
                 }
@@ -208,33 +204,19 @@ public class CarControl implements CarControlI{
     class Bridge {
         int limit;
         int carsatbridge = 0;
-        boolean CarWaiting = false;
 
         public synchronized void enter(int no) throws InterruptedException {
             while (carsatbridge >= limit){
                 wait();
             }
-            if (CarWaiting && no > 4){
-                while(CarWaiting || carsatbridge >= limit) {
-                    wait();
-                }
-                CarWaiting = false;
-            }
             carsatbridge++;
         }
 
         public synchronized void leave(int no, int row, int col){
-            if (row==10 && col==0 && no > 4) {
-                CarWaiting = true;
-            }
             notifyAll();
             carsatbridge--;
         }
 
-        public synchronized void leaving(){
-            CarWaiting = false;
-            notifyAll();
-        }
 
         public synchronized void setLimit(int k){
             if (k > limit) {
