@@ -27,6 +27,8 @@ public class CarTest extends Thread {
 
             case 1:
                 // Demonstration of removing/restoring
+                // The resulting behavior should show how when a car is removed and restored a little while later.
+                // The car is removed on the GUI and is restored correctly later on back at it's starting position.
                 cars.startAll();
                 sleep(2000);
                 cars.removeCar(6);
@@ -35,9 +37,23 @@ public class CarTest extends Thread {
                 break;
 
             case 2:
+                // Demonstration of restore right after remove
+                // The resulting behavior shows that if a car is directly restored right after a car is removed,
+                // the car will be restored as expected.
                 cars.startAll();
                 sleep(2000);
                 cars.removeCar(6);
+                cars.restoreCar(6);
+                break;
+
+            case 3:
+                // Demonstration of remove right after restore
+                cars.startAll();
+                sleep(2000);
+                cars.removeCar(6);
+                cars.restoreCar(6);
+                cars.removeCar(6);
+                sleep(5000);
                 cars.restoreCar(6);
                 break;
 
