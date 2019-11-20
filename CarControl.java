@@ -120,9 +120,11 @@ class Conductor extends Thread {
     }
 
     public synchronized void removeTheCar() {
-        System.out.println("row: " + curpos.row + " col: " + curpos.col);
         if(!removeCarBoolean[no]) {
             removeCarBoolean[no] = true;
+            if(atGate(curpos) && !mygate.isopen) {
+                mygate.open();
+            }
             try {
                 alley.wakeUpForRemoval();
                 fieldsync.wakeUpForRemoval();
@@ -135,8 +137,12 @@ class Conductor extends Thread {
     }
     public void restoreTheCar(int no) {
         if(removeCarBoolean[no]) {
-            restoreCarBoolean[no] = true;
-            removesync.wakeUp();
+            if(removesync.isSleeping[no]) {
+                restoreCarBoolean[no] = true;
+                removesync.wakeUp(no);
+            } else {
+                cd.println("Car not removed yet try again later");
+            }
         } else {
             cd.println("Car already registered");
         }
@@ -152,7 +158,6 @@ class Conductor extends Thread {
             boolean inAlley = false;
 
             while (true) {
-                try {
                     if (!removeCarBoolean[no]) {
                         if (atGate(curpos)) {
                             mygate.pass();
@@ -223,9 +228,6 @@ class Conductor extends Thread {
                             cd.register(car);
                         }
                     }
-                } catch (Exception e) {
-                    System.out.println("2nd catch: " + e);
-                }
             }
 
         } catch (Exception e) {
@@ -268,7 +270,9 @@ public class CarControl implements CarControlI{
                         wait();
                     }
                 }
-                sFields[row][col] = false;
+                if(!removeCarBoolean[no]) {
+                    sFields[row][col] = false;
+                }
             } catch (Exception e) {
                 System.out.println("Exception in fieldSync: " + e);
             }
@@ -419,12 +423,16 @@ public class CarControl implements CarControlI{
     }
 
     class removedSync {
+        boolean[] isSleeping = new boolean[9];
+
         public synchronized void sleep(int no) throws InterruptedException {
+            isSleeping[no] = true;
             while(!restoreCarBoolean[no]){
                 wait();
             }
         }
-        public synchronized void wakeUp() {
+        public synchronized void wakeUp(int no) {
+            isSleeping[no] = false;
             notifyAll();
         }
     }
