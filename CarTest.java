@@ -25,6 +25,29 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
+            case 1:
+                // Demonstration of Remove/Restore car at the same spot.
+                // The resulting behavior shows that a car being removed will be restored at the previous spot that it
+                // was removed from.
+                cars.startAll();
+                sleep(2000);
+                cars.removeCar(6);
+                sleep(3000);
+                cars.restoreCar(6);
+                break;
+
+            case 2:
+                // Demonstration of Remove/Restore car at the same spot inside the alley.
+                // The resulting behavior shows that the car can be restored inside the alley without problems.
+                cars.startAll();
+                sleep(7000);
+                cars.removeCar(6);
+                sleep(4000);
+                cars.restoreCar(6);
+                break;
+
+
+
             case 19:
                 // Demonstration of speed setting.
                 cars.println("Setting high speeds");
