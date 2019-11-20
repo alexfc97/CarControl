@@ -122,10 +122,10 @@ class Conductor extends Thread {
     public synchronized void removeTheCar() {
         if(!removeCarBoolean[no]) {
             removeCarBoolean[no] = true;
-            if(atGate(curpos) && !mygate.isopen) {
-                mygate.open();
-            }
             try {
+                if(atGate(curpos) && !mygate.isopen) {
+                    mygate.open();
+                }
                 alley.wakeUpForRemoval();
                 fieldsync.wakeUpForRemoval();
             } catch (Exception e) {
@@ -137,12 +137,12 @@ class Conductor extends Thread {
     }
     public void restoreTheCar(int no) {
         if(removeCarBoolean[no]) {
-            if(removesync.isSleeping[no]) {
                 restoreCarBoolean[no] = true;
-                removesync.wakeUp(no);
-            } else {
-                cd.println("Car not removed yet try again later");
-            }
+                try {
+                    removesync.wakeUp(no);
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
         } else {
             cd.println("Car already registered");
         }
@@ -156,11 +156,15 @@ class Conductor extends Thread {
             boolean hasBeenRemoved = false;
             boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
+            boolean removedWhileWaitingGate = false;
 
             while (true) {
                     if (!removeCarBoolean[no]) {
                         if (atGate(curpos)) {
                             mygate.pass();
+                            if(removeCarBoolean[no]) {
+                                removedWhileWaitingGate = true;
+                            }
                             car.setSpeed(chooseSpeed());
                         }
 
@@ -216,7 +220,13 @@ class Conductor extends Thread {
                                 fieldsync.leaveField(curpos.row, curpos.col);
                             }
                             hasBeenRemoved = true;
-                            removesync.sleep(no);
+                            if(removedWhileWaitingGate) {
+                                mygate.close();
+                                removedWhileWaitingGate = false;
+                            }
+                            if(!restoreCarBoolean[no]) {
+                                removesync.sleep(no);
+                            }
                         }
                         if (restoreCarBoolean[no]) {
                             removeCarBoolean[no] = false;
@@ -430,8 +440,12 @@ public class CarControl implements CarControlI{
             while(!restoreCarBoolean[no]){
                 wait();
             }
+            notifyAll();
         }
-        public synchronized void wakeUp(int no) {
+        public synchronized void wakeUp(int no) throws InterruptedException {
+            if(!isSleeping[no]) {
+                wait();
+            }
             isSleeping[no] = false;
             notifyAll();
         }
