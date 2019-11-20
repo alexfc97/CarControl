@@ -167,6 +167,7 @@ class Conductor extends Thread {
             boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
             boolean removedWhileWaitingGate = false;
+            boolean removedWhileAlleySync = false;
 
             while (true) {
                     if (!removeCarBoolean[no]) {
@@ -194,6 +195,8 @@ class Conductor extends Thread {
                                 // if car was removed while in the alley this is noted
                                 if (!removeCarBoolean[no]) {
                                     inAlley = true;
+                                } else {
+                                    removedWhileAlleySync = true;
                                 }
                             }
 
@@ -249,9 +252,11 @@ class Conductor extends Thread {
                             removeCarBoolean[no] = false;
                             hasBeenRemoved = false;
                             restoreCarBoolean[no] = false;
-                            // making new car to start at gate
-                            car = cd.newCar(no, col, startpos);
-                            curpos = startpos;
+                            // enter alley if car was in alley at time of removal
+                            if(inAlley || removedWhileAlleySync) {
+                                alley.enter(no);
+                                removedWhileAlleySync = false;
+                            }
                             // take start field
                             fieldsync.takeField(no, curpos.row, curpos.col);
                             // register car
