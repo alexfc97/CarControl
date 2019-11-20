@@ -120,7 +120,7 @@ class Conductor extends Thread {
         return pos.equals(barpos);
     }
 
-    public synchronized void removeTheCar() {
+    public void removeTheCar() {
         // check if car already been removed
         if(!removeCarBoolean[no]) {
             removeCarBoolean[no] = true;
