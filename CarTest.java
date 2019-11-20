@@ -25,6 +25,24 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
+            case 1:
+                // Demonstration of the barrier
+                // The resulting behavior should show that each car arrives at the barrier and wait until each car has
+                // arrived after which they will all be released.
+                cars.barrierOn();
+                cars.startAll();
+                break;
+
+            case 2:
+                // Demonstration of barrier shutdown
+                // The resulting behavior should show how after barrier shutdown is called and each car has arrived at
+                // the barrier, the barrier turns off.
+                cars.barrierOn();
+                cars.startAll();
+                sleep(1000);
+                cars.startBarrierShutDown();
+                break;
+
             case 19:
                 // Demonstration of speed setting.
                 cars.println("Setting high speeds");
