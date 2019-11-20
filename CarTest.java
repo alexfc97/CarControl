@@ -27,11 +27,17 @@ public class CarTest extends Thread {
 
             case 1:
                 // Demonstration of bumping and alley solution
+                // The resulting behavior should show how cars do not bump into each other.
+                // The test should also show how the alley synchronization has been implemented.
+                // If cars going the opposite direction are already in the alley, then a car will wait until they have
+                // all left.
                 cars.startAll();
                 break;
 
             case 2:
                 // Demonstration of The barrier solution
+                // The resulting behavior should show how after the barrier is turned on and each car has arrived at the
+                // barrier, Each car is released until the test is repeated again and again.
                 cars.startAll();
                 sleep(1000);
                 cars.barrierOn();
