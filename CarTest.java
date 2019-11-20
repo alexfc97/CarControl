@@ -27,9 +27,9 @@ public class CarTest extends Thread {
 
             case 1:
                 // Demonstration of Bridge
-                // Demonstrates how our functionality is correct for each value of the limit. The functionality doesn't show itself until the limit hits 3 or 4.
-                // The way the code is setup, cars will sometimes wait with driving onto the bridge even though they can. Even though they can it doesn't necessarily mean they should.
-                // So we have them wait until their group of cars can take the alley.
+                // The resulting behavior shows that cars will drive onto the bridge once they reach it. However at a
+                // certain point around K = 3 or 4, A deadlock will happen. This is because step 5 doesn't account for
+                // deadlocks being able to happen.
                 cars.startAll();
                 cars.setLimit(5);
                 sleep(30000);
@@ -43,6 +43,19 @@ public class CarTest extends Thread {
                 sleep(30000);
                 cars.setLimit(0);
                 sleep(3000);
+                break;
+
+            case 2:
+                // Demonstration of how SetLimit is dynamic
+                // The resulting behavior shows that cars will drive onto the bridge once they reach it. However at a
+                // certain point around K = 3 or 4, A deadlock will happen. In this test, we can see how SetLimit is
+                // able to solve this deadlock.
+                cars.startAll();
+                cars.setLimit(4);
+                sleep(30000);
+                cars.setLimit(3);
+                sleep(20000);
+                cars.setLimit(5);
                 break;
 
             case 19:
