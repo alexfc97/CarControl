@@ -25,6 +25,26 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
+            case 1:
+                // Demonstration of Bridge
+                // Demonstrates how our functionality is correct for each value of the limit. The functionality doesn't show itself until the limit hits 3 or 4.
+                // The way the code is setup, cars will sometimes wait with driving onto the bridge even though they can. Even though they can it doesn't necessarily mean they should.
+                // So we have them wait until their group of cars can take the alley.
+                cars.startAll();
+                cars.setLimit(5);
+                sleep(30000);
+                cars.setLimit(4);
+                sleep(30000);
+                cars.setLimit(3);
+                sleep(30000);
+                cars.setLimit(2);
+                sleep(30000);
+                cars.setLimit(1);
+                sleep(30000);
+                cars.setLimit(0);
+                sleep(3000);
+                break;
+
             case 19:
                 // Demonstration of speed setting.
                 cars.println("Setting high speeds");
