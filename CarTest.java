@@ -38,9 +38,10 @@ public class CarTest extends Thread {
                 // Demonstration of The barrier solution
                 // The resulting behavior should show how after the barrier is turned on and each car has arrived at the
                 // barrier, Each car is released until the test is repeated again and again.
+                cars.barrierOn();
                 cars.startAll();
                 sleep(1000);
-                cars.barrierOn();
+
                 break;
             case 19:
                 // Demonstration of speed setting.
