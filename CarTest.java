@@ -25,14 +25,31 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
-            case 19:
-                // Demonstration of speed setting.
-                cars.println("Setting high speeds");
-                for (int i = 1; i < 9; i++) {
-                    cars.setSpeed(i,20.0);
-                    cars.setVariation(i,20);
-                };
+            case 1:
+                // Demonstration of alley solution with monitors
+                // The resulting behavior should also show how the alley synchronization has been implemented.
+                // If cars going the opposite direction are already in the alley, then a car will wait until they have
+                // all left.
+                cars.startAll();
                 break;
+
+            case 2:
+                // Demonstration of The barrier solution with monitors
+                // The resulting behavior should show how after the barrier is turned on and each car has arrived at the
+                // barrier, Each car is released until the test is repeated again and again.
+                cars.barrierOn();
+                cars.startAll();
+                sleep(1000);
+                break;
+
+            case 19:
+            // Demonstration of speed setting.
+            cars.println("Setting high speeds");
+            for (int i = 1; i < 9; i++) {
+                cars.setSpeed(i,20.0);
+                cars.setVariation(i,20);
+            };
+            break;
 
             default:
                 cars.println("Test " + testno + " not available");
