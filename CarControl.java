@@ -147,7 +147,7 @@ class Conductor extends Thread {
                 restoreCarBoolean[no] = true;
                 try {
                     // wake up sleeping thread
-                    removesync.wakeUp(no);
+                    removesync.wakeUp();
                 } catch (Exception e) {
                     System.out.println(e);
                 }
@@ -459,20 +459,13 @@ public class CarControl implements CarControlI{
 
     class removedSync {
         // to mark if thread has been put to wait else in case of wakeup being called before sleep, wakeup has to wait for this
-        boolean[] isSleeping = new boolean[9];
 
         public synchronized void sleep(int no) throws InterruptedException {
-            isSleeping[no] = true;
             while(!restoreCarBoolean[no]){
                 wait();
             }
-            notifyAll();
         }
-        public synchronized void wakeUp(int no) throws InterruptedException {
-            if(!isSleeping[no]) {
-                wait();
-            }
-            isSleeping[no] = false;
+        public synchronized void wakeUp() throws InterruptedException {
             notifyAll();
         }
     }
