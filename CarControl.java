@@ -151,6 +151,7 @@ class Conductor extends Thread {
                 } catch (Exception e) {
                     System.out.println(e);
                 }
+         //   removeCarBoolean[no] = false;
         } else {
             cd.println("Car already registered");
         }
@@ -245,8 +246,8 @@ class Conductor extends Thread {
                             }
                         }
                         if (restoreCarBoolean[no]) {
-                            // no longer being removed or restored so booleans is set to false
                             removeCarBoolean[no] = false;
+                            // no longer being removed or restored so booleans is set to false
                             hasBeenRemoved = false;
                             restoreCarBoolean[no] = false;
                             // making new car to start at gate
