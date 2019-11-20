@@ -25,6 +25,22 @@ public class CarTest extends Thread {
                 cars.stopAll();
                 break;
 
+            case 1:
+                // Demonstration of removing/restoring
+                cars.startAll();
+                sleep(2000);
+                cars.removeCar(6);
+                sleep(1000);
+                cars.restoreCar(6);
+                break;
+
+            case 2:
+                cars.startAll();
+                sleep(2000);
+                cars.removeCar(6);
+                cars.restoreCar(6);
+                break;
+
             case 19:
                 // Demonstration of speed setting.
                 cars.println("Setting high speeds");
