@@ -57,6 +57,7 @@ class Conductor extends Thread {
     Boolean[] restoreCarBoolean;
     CarControl.removedSync removesync;
     CarControl.fieldSync fieldsync;
+    boolean[] removeCarGateOpen = new boolean[9];
 
 
     public Conductor(int no, CarDisplayI cd, Gate g, Boolean[][] sFields, CarControl.Alley alley,
@@ -120,12 +121,17 @@ class Conductor extends Thread {
     }
 
     public synchronized void removeTheCar() {
+        // check if car already been removed
         if(!removeCarBoolean[no]) {
             removeCarBoolean[no] = true;
             try {
+                // if waiting at gate open gate so thread is released
                 if(atGate(curpos) && !mygate.isopen) {
+                    // to mark that gate was opened here
+                    removeCarGateOpen[no] = true;
                     mygate.open();
                 }
+                // trying to wake up thread if waiting at alley or for a field to be free
                 alley.wakeUpForRemoval();
                 fieldsync.wakeUpForRemoval();
             } catch (Exception e) {
@@ -136,9 +142,11 @@ class Conductor extends Thread {
         }
     }
     public void restoreTheCar(int no) {
+        // check if car is already present
         if(removeCarBoolean[no]) {
                 restoreCarBoolean[no] = true;
                 try {
+                    // wake up sleeping thread
                     removesync.wakeUp(no);
                 } catch (Exception e) {
                     System.out.println(e);
@@ -153,7 +161,9 @@ class Conductor extends Thread {
             CarI car = cd.newCar(no, col, startpos);
             curpos = startpos;
             cd.register(car);
+            // to check later if car has been removed
             boolean hasBeenRemoved = false;
+            // local thread boolean to know which state car was in at time of removal
             boolean removedWhileWaitingForTile = false;
             boolean inAlley = false;
             boolean removedWhileWaitingGate = false;
@@ -162,7 +172,8 @@ class Conductor extends Thread {
                     if (!removeCarBoolean[no]) {
                         if (atGate(curpos)) {
                             mygate.pass();
-                            if(removeCarBoolean[no]) {
+                            // if gate was opened by removeCar method to wake thread up
+                            if(removeCarBoolean[no] && removeCarGateOpen[no]) {
                                 removedWhileWaitingGate = true;
                             }
                             car.setSpeed(chooseSpeed());
@@ -180,6 +191,7 @@ class Conductor extends Thread {
 
                             if ((newpos.row == 10 && newpos.col == 0) || (newpos.row == 2 && newpos.col == 1) || (newpos.row == 1 && newpos.col == 3)) {
                                 alley.enter(no);
+                                // if car was removed while in the alley this is noted
                                 if (!removeCarBoolean[no]) {
                                     inAlley = true;
                                 }
@@ -208,8 +220,10 @@ class Conductor extends Thread {
                             removedWhileWaitingForTile = true;
                         }
                     } else {
+                        // check if car has been removed yet
                         if (!hasBeenRemoved) {
                             cd.deregister(car);
+                            // leave alley if car was in alley at time of removal
                             if (inAlley) {
                                 alley.leave(no);
                             }
@@ -220,21 +234,27 @@ class Conductor extends Thread {
                                 fieldsync.leaveField(curpos.row, curpos.col);
                             }
                             hasBeenRemoved = true;
+                            // close the gate if gate was opened due to car being removed
                             if(removedWhileWaitingGate) {
                                 mygate.close();
                                 removedWhileWaitingGate = false;
                             }
+                            // put thread to wait until it is being restored
                             if(!restoreCarBoolean[no]) {
                                 removesync.sleep(no);
                             }
                         }
                         if (restoreCarBoolean[no]) {
+                            // no longer being removed or restored so booleans is set to false
                             removeCarBoolean[no] = false;
                             hasBeenRemoved = false;
                             restoreCarBoolean[no] = false;
+                            // making new car to start at gate
                             car = cd.newCar(no, col, startpos);
                             curpos = startpos;
+                            // take start field
                             fieldsync.takeField(no, curpos.row, curpos.col);
+                            // register car
                             cd.register(car);
                         }
                     }
@@ -433,6 +453,7 @@ public class CarControl implements CarControlI{
     }
 
     class removedSync {
+        // to mark if thread has been put to wait else in case of wakeup being called before sleep, wakeup has to wait for this
         boolean[] isSleeping = new boolean[9];
 
         public synchronized void sleep(int no) throws InterruptedException {
